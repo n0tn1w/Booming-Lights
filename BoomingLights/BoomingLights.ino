@@ -18,9 +18,9 @@
 #define Corange  RgbColor(255, 96, 0)
 #define Cwhite   RgbColor(128, 128, 128)
 #define Cblue    RgbColor(0, 64, 255)
-#define Cgreen   RgbColor(0, 192, 64)  
+#define Cgreen   RgbColor(0, 192, 64)
 
-RgbColor currentColor = Cred; 
+RgbColor currentColor = Cred;
 
 NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(NUM_LEDS, PIXEL_PIN);
 #define FFT_N 128 // Must be a power of 2
@@ -33,11 +33,11 @@ float blendIndex;
 
 unsigned long timerCount = 0;
 
-//const char* ssid = "Stanislav & Iva";
-//const char* password = "jjkofajj";
+const char* ssid = "Stanislav & Iva";
+const char* password = "jjkofajj";
 
-const char* ssid = "Plamen_2";
-const char* password = "0898630664";
+//const char* ssid = "Plamen_2";
+//const char* password = "0898630664";
 WiFiServer server(301);
 
 String header;
@@ -74,6 +74,11 @@ String colorToString(RgbColor e) {
   } else {
     return "No color";
   }
+}
+
+int getHexVal(char c) {
+  if ('0' <= c and c <= '9') return c - '0';
+  return 'c' - 'a' + 10;
 }
 
 
@@ -113,7 +118,7 @@ void waitForWiFiRequests( void * parameter ) {
               client.println("Content-type:text/html");
               client.println("Connection: close");
               client.println();
-              
+
               if (header.indexOf("GET /dynamic/on") >= 0) {
                 Serial.println("Dynamic Lights on");
                 state = ReactiveLights;
@@ -123,8 +128,8 @@ void waitForWiFiRequests( void * parameter ) {
                 state = StaticLights;
               } else if (header.indexOf("GET /static/off") >= 0) {
                 state = Off;
-              } 
-              
+              }
+
               if (header.indexOf("GET /color/red") >= 0) {
                 currentColor = Cred;
               } else if (header.indexOf("GET /color/orange") >= 0) {
@@ -135,6 +140,12 @@ void waitForWiFiRequests( void * parameter ) {
                 currentColor = Cblue;
               } else if (header.indexOf("GET /color/green") >= 0) {
                 currentColor = Cgreen;
+              } else if (header.indexOf("GET /color/") >= 0) {
+                // "GET /color/decade"
+                int r = getHexVal(header[11]) * 16 + getHexVal(header[12]);
+                int g = getHexVal(header[13]) * 16 + getHexVal(header[14]);
+                int b = getHexVal(header[15]) * 16 + getHexVal(header[16]);
+                currentColor = RgbColor(r,g,b);
               }
 
               // Display the HTML web page
@@ -162,7 +173,7 @@ void waitForWiFiRequests( void * parameter ) {
               client.println("  border-color: blue;");
               client.println("}");
               client.println("</style></head>");
-              
+
               // Web Page Heading
               client.println("<body><h1>Booming lights</h1>");
               String dynamicState = ((state == ReactiveLights) ? "On" : "Off");
@@ -172,7 +183,7 @@ void waitForWiFiRequests( void * parameter ) {
               } else {
                 client.println("<p><a href=\"/dynamic/on\"><button class=\"button\">ON</button></a></p>");
               }
-              
+
               String staticState = ((state == StaticLights) ? "On" : "Off");
               client.println("<p>Static Lights - State " + staticState + "</p>");
               if (state == StaticLights) {
@@ -189,6 +200,8 @@ void waitForWiFiRequests( void * parameter ) {
               client.println("<a href=\"/color/orange\"><button class=\"button orange\">Orange</button></a>");
               client.println("<a href=\"/color/white\"><button class=\"button white\">White</button></a>");
               client.println("<a href=\"/color/green\"><button class=\"button green\">Cyan</button></a>");
+              client.println("<input type=\"color\" class=\"pickColor\"/>");
+              client.println("<script> var selectedColor = document.querySelector(\".pickColor\"); selectedColor.addEventListener(\"change\", function (event){console.log(event.target.value);window.location = event.target.value.substring(1)}, false);</script>");
               client.println("</div>"); // Close the button wrapper div
               client.println("</div>"); // Close the container div
 
@@ -223,7 +236,7 @@ void makeLigthsReactToMusic( void * parameter ) {
       stopLights();
       delay(100);
       continue;
-    } else if (state == StaticLights) {         
+    } else if (state == StaticLights) {
       for (int i = 0; i < NUM_LEDS; i++) {
         strip.SetPixelColor(i, currentColor);
       }
@@ -235,9 +248,9 @@ void makeLigthsReactToMusic( void * parameter ) {
       }
       int end = millis();
       float total_time = float(end - begin) / 1000.0;
-  
+
       fft_execute(real_fft_plan);
-  
+
       for (int k = 0 ; k < real_fft_plan->size / 2 ; k += 2) {
         float len = sqrt(pow(real_fft_plan->output[2 * k], 2) + pow(real_fft_plan->output[2 * k + 1], 2));
         //float freq = float(k) / total_time;
@@ -277,7 +290,7 @@ void setup() {
 
   strip.Begin();
   strip.Show();
-  
+
   /*Syntax for assigning task to a core:
     xTaskCreatePinnedToCore(
                    coreTask,   // Function to implement the task
@@ -288,7 +301,7 @@ void setup() {
                    NULL,       // Task handle.
                    taskCore);  // Core where the task should run
   */
-  
+
   xTaskCreatePinnedToCore(    waitForWiFiRequests,    "waitForWiFiRequests",    20000,      NULL,    1,    &Task1,    0);
   delay(500);  // needed to start-up task1
   xTaskCreatePinnedToCore(    makeLigthsReactToMusic,    "makeLigthsReactToMusic",    5000,    NULL,    1,    &Task2,    1);

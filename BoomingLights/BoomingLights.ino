@@ -12,9 +12,15 @@
 #define MIC_PIN 34 // Warning! WiFi uses one of the ADCs, so only some of the pins can be used for analogRead!
 #define PIXEL_PIN 25
 
-#define Cred     RgbColor(255, 0, 0)
 #define Cblack   RgbColor(0,0,0)
 
+#define Cred     RgbColor(255, 0, 0)
+#define Corange  RgbColor(255, 96, 0)
+#define Cwhite   RgbColor(128, 128, 128)
+#define Cblue    RgbColor(0, 64, 255)
+#define Cgreen   RgbColor(0, 192, 64)  
+
+RgbColor currentColor = Cred; 
 
 NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(NUM_LEDS, PIXEL_PIN);
 #define FFT_N 128 // Must be a power of 2
@@ -25,9 +31,13 @@ float fft_output[FFT_N];
 fft_config_t *real_fft_plan = fft_init(FFT_N, FFT_REAL, FFT_FORWARD, fft_input, fft_output);
 float blendIndex;
 
+unsigned long timerCount = 0;
 
-const char* ssid = "Stanislav & Iva";
-const char* password = "jjkofajj";
+//const char* ssid = "Stanislav & Iva";
+//const char* password = "jjkofajj";
+
+const char* ssid = "Plamen_2";
+const char* password = "0898630664";
 WiFiServer server(301);
 
 String header;
@@ -49,6 +59,23 @@ String stateToString(State e) {
     default: return "Bad State";
   }
 }
+
+String colorToString(RgbColor e) {
+  if (e == Cred) {
+    return "Red";
+  } else if (e == Corange) {
+    return "Orange";
+  } else if (e == Cwhite) {
+    return "White";
+  } else if (e == Cblue) {
+    return "Blue";
+  } else if (e == Cgreen) {
+    return "Green";
+  } else {
+    return "No color";
+  }
+}
+
 
 State state = ReactiveLights;
 
@@ -86,38 +113,84 @@ void waitForWiFiRequests( void * parameter ) {
               client.println("Content-type:text/html");
               client.println("Connection: close");
               client.println();
-
-              // turns the GPIOs on and off
+              
               if (header.indexOf("GET /dynamic/on") >= 0) {
                 Serial.println("Dynamic Lights on");
                 state = ReactiveLights;
               } else if (header.indexOf("GET /dynamic/off") >= 0) {
-                Serial.println("Dynamic Lights  off");
                 state = Off;
+              } else if (header.indexOf("GET /static/on") >= 0) {
+                state = StaticLights;
+              } else if (header.indexOf("GET /static/off") >= 0) {
+                state = Off;
+              } 
+              
+              if (header.indexOf("GET /color/red") >= 0) {
+                currentColor = Cred;
+              } else if (header.indexOf("GET /color/orange") >= 0) {
+                currentColor = Corange;
+              } else if (header.indexOf("GET /color/white") >= 0) {
+                currentColor = Cwhite;
+              } else if (header.indexOf("GET /color/blue") >= 0) {
+                currentColor = Cblue;
+              } else if (header.indexOf("GET /color/green") >= 0) {
+                currentColor = Cgreen;
               }
 
               // Display the HTML web page
               client.println("<!DOCTYPE html><html>");
               client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
               client.println("<link rel=\"icon\" href=\"data:,\">");
-              // CSS to style the on/off buttons
-              // Feel free to change the background-color and font-size attributes to fit your preferences
               client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-              client.println(".button { background-color: #4CAF50; border: none; color: white; padding: 16px 40px;");
+              client.println(".button { background-color: #4CAF50; border: none; color: white; padding: 16px 40px; box-sizing: border-box;");
               client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-              client.println(".button2 {background-color: #555555;}</style></head>");
-
+              client.println(".button2 { background-color: #555555; }");
+              client.println(".red { background-color: red; }");
+              client.println(".blue { background-color: blue; }");
+              client.println(".orange { background-color: orange; }");
+              client.println(".white { background-color: white; color: black; border: 2px solid black; padding: 14px 38px; }");
+              client.println(".green { background-color: cyan; }");
+              client.println("<style>");
+              client.println(".my-input {");
+              client.println("  width: 200px;");
+              client.println("  padding: 10px;");
+              client.println("  border: 1px solid #ccc;");
+              client.println("  border-radius: 4px;");
+              client.println("}");
+              client.println(".my-input:focus {");
+              client.println("  outline: none;");
+              client.println("  border-color: blue;");
+              client.println("}");
+              client.println("</style></head>");
+              
               // Web Page Heading
               client.println("<body><h1>Booming lights</h1>");
-
-              // Display current state, and ON/OFF buttons for GPIO 26
-              client.println("<p>Dynamic Lights - State " + stateToString(state) + "</p>");
-              // If the output26State is off, it displays the ON button
-              if (state == Off) {
-                client.println("<p><a href=\"/dynamic/on\"><button class=\"button\">ON</button></a></p>");
-              } else {
+              String dynamicState = ((state == ReactiveLights) ? "On" : "Off");
+              client.println("<p>Dynamic Lights - State " + dynamicState + "</p>");
+              if (state == ReactiveLights) {
                 client.println("<p><a href=\"/dynamic/off\"><button class=\"button button2\">OFF</button></a></p>");
+              } else {
+                client.println("<p><a href=\"/dynamic/on\"><button class=\"button\">ON</button></a></p>");
               }
+              
+              String staticState = ((state == StaticLights) ? "On" : "Off");
+              client.println("<p>Static Lights - State " + staticState + "</p>");
+              if (state == StaticLights) {
+                client.println("<p><a href=\"/static/off\"><button class=\"button button2\">OFF</button></a></p>");
+              } else {
+                client.println("<p><a href=\"/static/on\"><button class=\"button\">ON</button></a></p>");
+              }
+
+              client.println("<p>Color Lights : " + colorToString(currentColor) + "</p>");
+              client.println("<div class=\"container\">"); // Add a container class
+              client.println("<div class=\"button-wrapper\">"); // Add a button wrapper div
+              client.println("<a href=\"/color/red\"><button class=\"button red\">Red</button></a>");
+              client.println("<a href=\"/color/blue\"><button class=\"button blue\">Blue</button></a>");
+              client.println("<a href=\"/color/orange\"><button class=\"button orange\">Orange</button></a>");
+              client.println("<a href=\"/color/white\"><button class=\"button white\">White</button></a>");
+              client.println("<a href=\"/color/green\"><button class=\"button green\">Cyan</button></a>");
+              client.println("</div>"); // Close the button wrapper div
+              client.println("</div>"); // Close the container div
 
               client.println("</body></html>");
 
@@ -144,36 +217,39 @@ void waitForWiFiRequests( void * parameter ) {
   }
 }
 
-
-
 void makeLigthsReactToMusic( void * parameter ) {
   for (;;) {
-    if ( state != ReactiveLights) {
+    if ( state == Off) {
       stopLights();
       delay(100);
       continue;
-    }
-
-    int begin = millis();
-    for (int k = 0 ; k < FFT_N ; k++) {
-      real_fft_plan->input[k] = analogRead(MIC_PIN);
-    }
-    int end = millis();
-    float total_time = float(end - begin) / 1000.0;
-
-    fft_execute(real_fft_plan);
-
-    for (int k = 0 ; k < real_fft_plan->size / 2 ; k += 2) {
-      float len = sqrt(pow(real_fft_plan->output[2 * k], 2) + pow(real_fft_plan->output[2 * k + 1], 2));
-      //float freq = float(k) / total_time;
-      if (k > 0 && k < 32 && len > 600) {
-        blendIndex = len / 50000.0;
-      } else {
-        blendIndex = 0.0;
+    } else if (state == StaticLights) {         
+      for (int i = 0; i < NUM_LEDS; i++) {
+        strip.SetPixelColor(i, currentColor);
       }
-      strip.SetPixelColor(k / 2, RgbColor::LinearBlend(Cblack, Cred, blendIndex));
+      strip.Show();
+    } else {
+      int begin = millis();
+      for (int k = 0 ; k < FFT_N ; k++) {
+        real_fft_plan->input[k] = analogRead(MIC_PIN);
+      }
+      int end = millis();
+      float total_time = float(end - begin) / 1000.0;
+  
+      fft_execute(real_fft_plan);
+  
+      for (int k = 0 ; k < real_fft_plan->size / 2 ; k += 2) {
+        float len = sqrt(pow(real_fft_plan->output[2 * k], 2) + pow(real_fft_plan->output[2 * k + 1], 2));
+        //float freq = float(k) / total_time;
+        if (k > 0 && k < 32 && len > 600) {
+          blendIndex = len / 50000.0;
+        } else {
+          blendIndex = 0.0;
+        }
+        strip.SetPixelColor(k / 2, RgbColor::LinearBlend(Cblack, currentColor, blendIndex));
+      }
+      strip.Show();
     }
-    strip.Show();
   }
 }
 
@@ -201,6 +277,7 @@ void setup() {
 
   strip.Begin();
   strip.Show();
+  
   /*Syntax for assigning task to a core:
     xTaskCreatePinnedToCore(
                    coreTask,   // Function to implement the task
@@ -211,6 +288,7 @@ void setup() {
                    NULL,       // Task handle.
                    taskCore);  // Core where the task should run
   */
+  
   xTaskCreatePinnedToCore(    waitForWiFiRequests,    "waitForWiFiRequests",    20000,      NULL,    1,    &Task1,    0);
   delay(500);  // needed to start-up task1
   xTaskCreatePinnedToCore(    makeLigthsReactToMusic,    "makeLigthsReactToMusic",    5000,    NULL,    1,    &Task2,    1);
